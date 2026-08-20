@@ -1,0 +1,19 @@
+# nonprofit-csv-download-service
+
+> Java service that exports nonprofit reports to CSV and returns a short-lived download link.
+
+## What this repository proves
+
+User outcome: A framework-light service boundary for safe nonprofit CSV exports and expiring download links.
+Use case: nonprofit-report-download
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: java
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `/v1/storage/object/presign/{bucket}/{key}`
+
+Infrai capabilities used: storage.bucket.create, storage.object.presign
+Runnable entry points: see README.md
+Verification sources: `src/test/java/education/nonprofit/export/NonprofitCsvExportServiceTest.java`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt

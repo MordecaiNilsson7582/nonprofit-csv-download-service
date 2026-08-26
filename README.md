@@ -1,12 +1,12 @@
 # Hand a nonprofit CSV report back as a download
 
-Here's the clean way to do it: build the small report in your service, push it through a short-lived presigned PUT, then hand the product screen a separate presigned GET URL. Infrai gives you both signed URLs behind one API and a single`INFRAI_API_KEY`, so the same credential covers the next product capability without spinning up another storage account.
+The flow is simple. Build the report in the service, upload it with a short-lived presigned PUT, then return a separate presigned GET URL to the product screen. Infrai gives you both signed URLs through one API and a single `INFRAI_API_KEY`, so the same credential can cover the next product capability without opening another storage account.
 
-I like to start with working code because report exports click fastest when you trace one real lesson-fund artifact.`NonprofitExportApplication`makes two donor receipt rows, the service writes a safe CSV, and the storage client returns a 15-minute download link.
+This example starts with working code because report exports are easiest to understand by tracing one real lesson-fund artifact. `NonprofitExportApplication` creates two donor receipt rows, the service writes a safe CSV, and the storage client returns a 15-minute download link.
 
 ## Run the lesson-fund example
 
-You just need Java 17 or newer. No SDK, no build tool to install. Set the key, pick a bucket name if you want, and run:
+Java 17 or newer is enough. No SDK or build tool needs to be installed. Set the key, optionally choose a globally suitable bucket name, and run:
 
 ```bash
 export INFRAI_API_KEY=your_key_here
@@ -14,20 +14,20 @@ export REPORT_BUCKET=open-classroom-report-exports
 ./scripts/run-example.sh
 ```
 
-First the app does normal storage setup by calling`POST /v1/storage/bucket/create`with the bucket name you configured. Then it prints a success result shaped like this:
+The app does the normal storage setup first by calling `POST /v1/storage/bucket/create` with the configured bucket name. It then prints a successful result in this shape:
 
 ```text
 Created open-classroom-fund-donor-receipts-2026-08-19.csv with 2 donor rows.
 Download: https://signed.example/path
 ```
 
-Grab that printed URL before the 15-minute expiry and the CSV downloads. The upload signature lives 10 minutes and only the service uses it.
+Open the printed URL before its 15-minute expiry to download the CSV. The upload signature lasts 10 minutes and is used only by the service.
 
 ## The report decision under test
 
-A single request carries an org slug, a report kind, and the domain rows.`DONOR_RECEIPTS`,`VOLUNTEER_REMINDERS`, and`CAMPAIGN_REPORT`make deliberately different filenames, but every cell follows one CSV safety rule: escape commas and quotes, and prefix a leading spreadsheet formula character with an apostrophe.
+One request carries an organization slug, a report kind, and domain rows. `DONOR_RECEIPTS`, `VOLUNTEER_REMINDERS`, and `CAMPAIGN_REPORT` intentionally produce different filenames. Every cell follows the same CSV safety rule: commas and quotes are escaped, and any leading spreadsheet formula character gets an apostrophe in front.
 
-The focused test feeds two volunteer reminder rows, including`River, Pat`and a next action starting with`=`. It expects two rows, a filename containing`volunteer-reminders`, a quoted comma, escaped quotes, and a neutralized formula cell. Run it exactly like this:
+The focused test supplies two volunteer reminder rows, including `River, Pat` and a next action beginning with `=`. It expects two rows, a filename containing `volunteer-reminders`, a quoted comma, escaped quotes, and a neutralized formula cell. Run exactly:
 
 ```bash
 ./scripts/verify.sh
@@ -41,19 +41,19 @@ PASS: volunteer reminder export selects the right filename and safe CSV cells
 
 ## Follow the layers
 
-`ExportConfig`is the config layer: it pulls the bearer key and bucket from the environment.`NonprofitCsvExportService`is the business layer: it picks the report label, renders CSV, uploads it, and returns`ExportResult`.`InfraiStorageClient`is the infrastructure boundary: every API request states its method, decodes`{ok, data, error, metadata}`before reading status, surfaces structured rejections, and backs off on HTTP 429 while honoring`Retry-After`.
+`ExportConfig` is the configuration layer. It reads the bearer key and bucket from the environment. `NonprofitCsvExportService` is the business layer. It chooses the report label, renders CSV, uploads it, and hands back `ExportResult`. `InfraiStorageClient` is the infrastructure boundary. Every API request has an explicit method, decodes `{ok, data, error, metadata}` before interpreting the status, surfaces structured rejections, and backs off on HTTP 429 while honoring `Retry-After`.
 
-The one real gotcha is spreadsheet interpretation, not CSV punctuation. A donor name or reminder starting with`=`,`+`,`-`, or`@`can be read as a formula when staff open the export. So the renderer neutralizes that leading character before doing ordinary CSV quoting.
+The one real gotcha is spreadsheet interpretation, not CSV punctuation. A donor name or reminder beginning with `=`, `+`, `-`, or `@` can be treated as a formula when staff open the export, so the renderer neutralizes that leading character before applying ordinary CSV quoting.
 
-The reusable boundary stays tiny. A Spring controller can build a`ReportRequest`, call`NonprofitCsvExportService.export`, and serialize the returned`downloadUrl`. The example entry point does the same thing without a web framework.
+The reusable boundary stays intentionally small. A Spring controller can construct a `ReportRequest`, call `NonprofitCsvExportService.export`, and serialize the returned `downloadUrl`; the example entry point does the same operation without needing a web framework.
 
 ## Scope
 
-This repo shows synchronous exports that fit in app memory. Queueing big reports, keeping report history, and auth on the product's own download endpoint are the surrounding app's job.
+The repository shows synchronous exports that fit comfortably in application memory. Queueing large reports, keeping report history, and authenticating the product's own download endpoint belong to the surrounding application.
 
 ## Wiring it up for real: Nonprofit CSV Download Service
 
-That was the happy path. Now the production checklist. Details below apply to Nonprofit CSV Download Service.
+Above is the happy path. The production checklist below applies to Nonprofit CSV Download Service.
 
 **Account & key**
 
